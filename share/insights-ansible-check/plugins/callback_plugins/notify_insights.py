@@ -29,6 +29,13 @@ from ansible.playbook.task_include import TaskInclude
 from ansible.plugins.callback import CallbackBase
 from ansible.utils.color import stringc
 
+HasSubjectAltNameWarning = False
+try:
+    from requests.packages.urllib3.exceptions import SubjectAltNameWarning
+    HasSubjectAltNameWarning = True
+except:
+    pass
+
 found_conf_name = 'insights-client'
 found_default_conf_dir = os.path.join('/etc', found_conf_name)
 for each in ['insights-client', 'redhat-access-insights']:
@@ -223,10 +230,16 @@ class CallbackModule(CallbackBase):
 
         self._display.vvv("PUT %s" % url)
         self._display.vvv("VERIFY %s" % verify)
+        if HasSubjectAltNameWarning:
+            self._display.vvv("Ignoring SubjectAltNameWarning for this PUT")
+        else:
+            self._display.vvv("Ignoring all warnings for this PUT")
         self._display.vvv(json.dumps(policy_result, indent=2))
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore",
-                                  requests.packages.urllib3.exceptions.SubjectAltNameWarning)
+            if HasSubjectAltNameWarning:
+                warnings.simplefilter("ignore", SubjectAltNameWarning)
+            else:
+                warnings.simplefilter("ignore")
             res = requests.put(url=url,
                                data=json.dumps(policy_result),
                                headers=headers,
