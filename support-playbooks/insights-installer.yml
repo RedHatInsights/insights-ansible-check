@@ -1,11 +1,18 @@
+---
+# This playbook
+#  ensures that 'redhat-access-insights' is installed
+#  ensures that system is registered with Insights service
+#  ensures that Insights system_id fact collector is installed
+#
 - hosts: all
-  user: root
+  become: yes
   tasks:
 
     - name: need libselinux-python to run ansible on RHEL
       yum:
         name: libselinux-python
         state: present
+      when: ansible_distribution == "RedHat" or ansible_distribution == "Fedora"
 
     - name: Install redhat-access-insights
       yum:
@@ -21,8 +28,10 @@
       file: state=directory recurse=yes path=/etc/ansible/facts.d
     - name: install custom impi fact
       copy: src=insights.fact dest=/etc/ansible/facts.d mode=a+x
+
+
     - name: re-read facts after adding custom fact
       setup: filter=ansible_local
-    - debug: var=ansible_local.insights.machine_id
-    - debug: var=ansible_local.insights.system_id
-    - debug: var=ansible_local.insights
+    - name: check that we are getting system_id
+      assert:
+        that: ansible_local.insights.system_id != ""
