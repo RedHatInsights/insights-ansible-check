@@ -145,7 +145,7 @@ the Insights collector (redhat-access-insights) must be installed and registered
 system, and the Insights fact plugin must be installed on each target system.  The
 ``insights-installer.yml`` playbook in ``support-playbooks`` will ensure both of these are true::
 
-  ansible-playbook -l <HOSTLIST> support-playbooks/insights-installer.yml
+  ./ansible-playbook -l <HOSTLIST> support-playbooks/insights-installer.yml
 
 
 Installing 'insights-ansible-check'
@@ -154,9 +154,18 @@ Installing 'insights-ansible-check'
 The command ``insights-ansible-check`` can be run directly from within the git repo, as all
 the examples above do.
 
-It can also be install onto a system::
+It can also be installed onto a system.
+
+For RHEL6 and RHEL7 production systems, first ensure that Ansible is installed on the system.
+See `Ansible Installation <http://docs.ansible.com/ansible/latest/intro_installation.html>`_.
+Then::
+
+    sudo make install
+
+
+For enviroments with pip installed, or within Python virtual enviroments::
 
     sudo pip install .
 
-will install both the command and the associate Ansible plugins onto the current system.
-
+will install both the command and the associate Ansible plugins onto the current system, along
+with all of it's dependancies, including Ansible.
