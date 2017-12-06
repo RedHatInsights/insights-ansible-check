@@ -13,6 +13,11 @@ Ansible must be installed and an Ansible inventory file created for any of the e
 in this README to work.  See `Ansible Installation
 <http://docs.ansible.com/ansible/latest/intro_installation.html>`_.
 
+The Python module ``requests`` must also be installed::
+
+  yum install -y python-requests
+
+
 Insights Check Mode
 ---------
 
