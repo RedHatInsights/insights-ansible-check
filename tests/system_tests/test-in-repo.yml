@@ -1,0 +1,91 @@
+---
+# This playbook does an end-to-end test of ./insights-ansible-check on each target host.
+#
+# This playbook only works on RHEL 6 and 7.
+#
+# This playbook assumes it is being run from within the insights-ansible-check git repo.
+#
+# The insights-ansible-check script has two prerequsites that don't typically exist on
+# RHEL6 and RHEL7 hosts: ansible and python-requests. Installing these prerequsites is
+# not as easy as 'yum install', so we have created some shell scripts to install them.
+# A main goal of this playbook is to test these scripts. 
+#
+# In addition to the target hosts, this playbook requires that an additional host exists
+#   and is reachable from each target host by ansible through ssh.
+#   The name of this additional host is specified as an extra variable to this script,
+#   named 'checkhost':
+#
+#    ansible-playbook -l $NAME -e checkhost=gavin-rhel66-nofips tests/system_tests/test-in-repo.yml
+#
+#
+# For each target host:
+#   * remove any existing prerequsites using ansible modules
+#   * rsync the git repo to the target host
+#   * install the prerequsites using installation scripts in the repo to test these scripts
+#   * run ./insights-ansible-check against 'checkhost'
+#   * print out the results (this should be improved)
+#
+- hosts: all
+  tasks:
+
+    # this only works on RHEL6 and RHEL7, FIXME
+    - name: only works on RHEL 6 and 7
+      assert:
+        that: ansible_distribution == "RedHat"
+
+
+    # This section undoes the things that RHELX-install-ansible.sh does
+    #   so that this test actually tests something
+    - name: remove ansible package so we can test script
+      package:
+        name: ansible
+        state: absent
+
+    - name: remove epel package
+      package:
+        name: epel-release
+        state: absent
+      when: ansible_distribution_major_version == "6"
+
+    - name: disable rhel-7-server-extras-rpms
+      command: subscription-manager repos --disable=rhel-7-server-extras-rpms
+      when: ansible_distribution_major_version == "7"
+
+
+    # copy local insights-ansible-check repo to remote
+    - name: install rsync - synchronize won't work without rsync
+      package:
+        name: rsync
+
+    - name: copy local insights-ansible-check repo to remote
+      synchronize:
+        src: ../../../../insights-ansible-check/
+        dest: ./insights-ansible-check
+
+
+
+    - name: install python-requests
+      package:
+        name: python-requests
+
+    - name: run install-ansible.sh
+      command: ./tests/system_tests/rhel{{ansible_distribution_major_version}}-install-ansible.sh
+      args:
+        chdir: ./insights-ansible-check/
+      when: ansible_distribution == "RedHat"
+
+
+
+    - name: add known host keys for {{ checkhost }}
+      shell: ssh-keyscan {{ checkhost }} >>.ssh/known_hosts
+      # so that we don't get prompts for this when running insights-ansible-check
+
+
+    - name: run a test of insights-ansible-check
+      command: ./insights-ansible-check -i {{ checkhost }}, playbooks/fips-mode-check.yml
+      args:
+        chdir: ./insights-ansible-check/
+      register: check_task
+
+    - debug: var=check_task.stdout_lines
+
