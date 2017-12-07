@@ -150,7 +150,7 @@ the Insights collector (redhat-access-insights) must be installed and registered
 system, and the Insights fact plugin must be installed on each target system.  The
 ``insights-installer.yml`` playbook in ``support-playbooks`` will ensure both of these are true::
 
-  ./ansible-playbook -l <HOSTLIST> support-playbooks/insights-installer.yml
+     ansible-playbook -l <HOSTLIST> support-playbooks/insights-installer.yml
 
 
 Installing 'insights-policy-check'
