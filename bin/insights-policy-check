@@ -1,6 +1,6 @@
 #!/bin/env bash
 
-PLUGINS=$(readlink -m "$0/../../share/insights-ansible-check/plugins")
+PLUGINS=$(readlink -m "$0/../../share/insights-policy-check/plugins")
 
 export ANSIBLE_CALLBACK_PLUGINS=${PLUGINS}/callback_plugins
 export ANSIBLE_ACTION_PLUGINS=${PLUGINS}/action_plugins

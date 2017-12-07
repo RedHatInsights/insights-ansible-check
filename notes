@@ -42,7 +42,7 @@ Initial Working Sketch
 
    new "check" module so fact checks can be interpreted like module checks
 
-   new command 'insights-ansible-check' to make it easy to run playbooks
+   new command 'insights-policy-check' to make it easy to run playbooks
      in --check mode with the plugins enabled
 
 

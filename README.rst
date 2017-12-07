@@ -1,4 +1,4 @@
-Custom Insights Rules as Ansible Playbooks, Ansible Playbooks that act as Insights Rules
+Custom Insights Policies as Ansible Playbooks, Ansible Playbooks that act as Insights Policies
 ---------------
 
 This is just the beginnings of a proof of concept.
@@ -7,7 +7,7 @@ The general idea is that we run mostly normal Ansible playbooks in ``--check`` m
 interpret the result of each task in the playbook as a conformance test, and then forward
 those interpreted results to Insights for display::
 
-   ./insights-ansible-check --limit=localhost playbooks/no-dummy-hostname.yml
+   ./insights-policy-check --limit=localhost playbooks/no-dummy-hostname.yml
 
 Ansible must be installed and an Ansible inventory file created for any of the examples
 in this README to work.  See `Ansible Installation
@@ -32,7 +32,7 @@ the playbook.
 
 In the example below are two RHEL 6.6 machines, one with FIPS mode enabled one without::
 
-    $ ./insights-ansible-check --limit=gavin-rhel66-nofips,gavin-rhel66-yesfips playbooks/fips-mode-check.yml 
+    $ ./insights-policy-check --limit=gavin-rhel66-nofips,gavin-rhel66-yesfips playbooks/fips-mode-check.yml 
 
     PLAY [all] *********************************************************************
 
@@ -77,14 +77,14 @@ instance, and not include it in the CHECKMODE SUMMARY.
 The Insights Check Mode command:
 ----------
 
-The command ``insights-ansible-check`` runs an Ansible playbook in Insights Check Mode.  This
+The command ``insights-policy-check`` runs an Ansible playbook in Insights Check Mode.  This
 command is just a wrapper around the ``ansible-playbook`` command.
 
-Ansible must be installed on the system where you run the insights-ansible-check command, and
-you must have set up an Ansible Inventory for any systems you want to run ``insights-ansible-check``
+Ansible must be installed on the system where you run the insights-policy-check command, and
+you must have set up an Ansible Inventory for any systems you want to run ``insights-policy-check``
 against.
 
-The command ``insights-ansible-check`` takes exactly the same arguments as ``ansible-playbook``
+The command ``insights-policy-check`` takes exactly the same arguments as ``ansible-playbook``
 
 Playbooks for Insights Check Mode
 ------
@@ -110,7 +110,7 @@ playbooks/error.yml
 
 Run these playbooks in Insights Check Mode::
 
-    ./insights-ansible-check --limit=<HOST PATTERN> <CHECK PLAYBOOK>
+    ./insights-policy-check --limit=<HOST PATTERN> <CHECK PLAYBOOK>
 
 where ``<HOST PATTERN>`` is a comma separated list of hosts to run the check against 
 ``<CHECK PLAYBOOK>`` is one of :
@@ -133,10 +133,10 @@ Sending Data to Insights
 ------
 
 To send Insights Check Mode data to the Insights service, two things must be true.  First,
-``insights-ansible-check`` must log into Insights from the control system.  Second, it
+``insights-policy-check`` must log into Insights from the control system.  Second, it
 must be able to get the Insights System ID off each target system.
 
-For ``insights-ansible-check`` to be able to log into Insights from the control system, you
+For ``insights-policy-check`` to be able to log into Insights from the control system, you
 must put a Red Hat username/password in ``~/.insights.conf``::
   [insights-client]
   username=<USERNAME>
@@ -145,7 +145,7 @@ must put a Red Hat username/password in ``~/.insights.conf``::
 Where ``<USERNAME>`` and ``<PASSWORD>`` are valid for Red Hat Insights (Red Hat Portal,
 RHN, or RHSM).
 
-For ``insights-ansible-check`` to be able to get the Insights System ID off each target system,
+For ``insights-policy-check`` to be able to get the Insights System ID off each target system,
 the Insights collector (redhat-access-insights) must be installed and registered on each target
 system, and the Insights fact plugin must be installed on each target system.  The
 ``insights-installer.yml`` playbook in ``support-playbooks`` will ensure both of these are true::
@@ -153,10 +153,10 @@ system, and the Insights fact plugin must be installed on each target system.  T
   ./ansible-playbook -l <HOSTLIST> support-playbooks/insights-installer.yml
 
 
-Installing 'insights-ansible-check'
+Installing 'insights-policy-check'
 ------
 
-The command ``insights-ansible-check`` can be run directly from within the git repo, as all
+The command ``insights-policy-check`` can be run directly from within the git repo, as all
 the examples above do.
 
 It can also be installed onto a system.

@@ -1,11 +1,11 @@
 ---
-# This playbook does an end-to-end test of ./insights-ansible-check on each target host.
+# This playbook does an end-to-end test of ./insights-policy-check on each target host.
 #
 # This playbook only works on RHEL 6 and 7.
 #
-# This playbook assumes it is being run from within the insights-ansible-check git repo.
+# This playbook assumes it is being run from within the insights-policy-check git repo.
 #
-# The insights-ansible-check script has two prerequsites that don't typically exist on
+# The insights-policy-check script has two prerequsites that don't typically exist on
 # RHEL6 and RHEL7 hosts: ansible and python-requests. Installing these prerequsites is
 # not as easy as 'yum install', so we have created some shell scripts to install them.
 # A main goal of this playbook is to test these scripts. 
@@ -22,7 +22,7 @@
 #   * remove any existing prerequsites using ansible modules
 #   * rsync the git repo to the target host
 #   * install the prerequsites using installation scripts in the repo to test these scripts
-#   * run ./insights-ansible-check against 'checkhost'
+#   * run ./insights-policy-check against 'checkhost'
 #   * print out the results (this should be improved)
 #
 - hosts: all
@@ -52,15 +52,15 @@
       when: ansible_distribution_major_version == "7"
 
 
-    # copy local insights-ansible-check repo to remote
+    # copy local insights-policy-check repo to remote
     - name: install rsync - synchronize won't work without rsync
       package:
         name: rsync
 
-    - name: copy local insights-ansible-check repo to remote
+    - name: copy local insights-policy-check repo to remote
       synchronize:
-        src: ../../../../insights-ansible-check/
-        dest: ./insights-ansible-check
+        src: ../../../
+        dest: ./insights-policy-check
 
 
 
@@ -71,20 +71,20 @@
     - name: run install-ansible.sh
       command: ./tests/system_tests/rhel{{ansible_distribution_major_version}}-install-ansible.sh
       args:
-        chdir: ./insights-ansible-check/
+        chdir: ./insights-policy-check/
       when: ansible_distribution == "RedHat"
 
 
 
     - name: add known host keys for {{ checkhost }}
       shell: ssh-keyscan {{ checkhost }} >>.ssh/known_hosts
-      # so that we don't get prompts for this when running insights-ansible-check
+      # so that we don't get prompts for this when running insights-policy-check
 
 
-    - name: run a test of insights-ansible-check
-      command: ./insights-ansible-check -i {{ checkhost }}, playbooks/fips-mode-check.yml
+    - name: run a test of insights-policy-check
+      command: ./insights-policy-check -i {{ checkhost }}, playbooks/fips-mode-check.yml
       args:
-        chdir: ./insights-ansible-check/
+        chdir: ./insights-policy-check/
       register: check_task
 
     - debug: var=check_task.stdout_lines
