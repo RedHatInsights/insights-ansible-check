@@ -1,0 +1,37 @@
+---
+# setup .insights.conf to enable insights-policy-check to send its results to the Insights service
+#
+#    this playbook expects two extra variables:
+#         redhat_portal_username
+#         redhat_portal_password
+#    to be set to Insights (Red Hat Portal) credentials.
+#
+#    These credentials will be written to a file on each target.
+#
+#    ansible-playbook --limit=<HOSTLIST> \
+#         --extra-vars="redhat_portal_username=<USERNAME> redhat_portal_password=<PASSWORD>" \
+#         create-insights-conf.yml
+#
+- hosts: all
+  tasks:
+    - name: add username to .insights.conf
+      ini_file:
+        path: ./.insights.conf
+        section: insights-client
+        option: username
+        value: "{{ redhat_portal_username }}"
+        no_extra_spaces: true
+        create: true
+        mode: u=rw,go=
+        state: present
+
+    - name: add password to .insights.conf
+      ini_file:
+        path: ./.insights.conf
+        section: insights-client
+        option: password
+        value: "{{ redhat_portal_password }}"
+        no_extra_spaces: true
+        create: true
+        mode: u=rw,go=
+        state: present
