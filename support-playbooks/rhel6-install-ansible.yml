@@ -1,0 +1,20 @@
+---
+# This playbook installs Ansible on a RHEL6 target from EPEL
+- hosts: all
+  become: yes
+  tasks:
+
+    # this only works on RHEL6
+    - name: only works on RHEL 6
+      assert:
+        that:
+          - ansible_distribution == "RedHat"
+          - ansible_distribution_major_version == "6"
+
+    - name: Install/Enable EPEL
+      package:
+        name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
+
+    - name: Install Ansible
+      package:
+        name: ansible

@@ -1,0 +1,13 @@
+---
+# This playbook installs 'insights-policy-check' prerequsites
+- hosts: all
+  become: yes
+  tasks:
+
+    - name: Install Ansible
+      package:
+        name: ansible
+
+    - name: Install python package requests
+      package:
+        name: python-requests
