@@ -9,9 +9,9 @@ __metaclass__ = type
 DOCUMENTATION = '''
     callback: notify_insights
     type: notification
-    short_description: Sends events to Insights
+    short_description: Treat task results as PASS/FAIL and sends results to Insights as a Policy
     description:
-      - This callback will task events to Insights
+      - Treat task results as PASS/FAIL and sends results to Insights as a Policy
     requirements:
 '''
 
@@ -167,11 +167,11 @@ class CallbackModule(CallbackBase):
             "raw_output": "",
             "check_results": []
         }
-        for event_name, task_title, result in data:
-            if event_name != "skipped":
+        for task_result_summary, task_title, task_result_full in data:
+            if task_result_summary != "skipped":
                 policy_result["check_results"].append({
                     "name": task_title,
-                    "result": event_name,
+                    "result": task_result_summary,
                 })
 
         return policy_result
@@ -202,18 +202,18 @@ class CallbackModule(CallbackBase):
         self._display.display("")
 
 
-    def _format_summary_for(self, task_result):
-        if task_result["result"] == "passed":
-            icon = stringc("passed", C.COLOR_OK) 
-        elif task_result["result"] == "failed":
-            icon = stringc("failed", C.COLOR_ERROR)
-        elif task_result["result"] == "fatal":
+    def _format_summary_for(self, check_result):
+        if check_result["result"] == "pass":
+            icon = stringc("pass", C.COLOR_OK)
+        elif check_result["result"] == "fail":
+            icon = stringc("fail", C.COLOR_ERROR)
+        elif check_result["result"] == "fatal":
             icon = stringc("ERROR", C.COLOR_ERROR)
         else:
-            icon = stringc(task_result["result"], C.COLOR_DEBUG)
+            icon = stringc(check_result["result"], C.COLOR_DEBUG)
 
-        return "    %s : %s"  % (icon, task_result["name"])
-    
+        return "    %s : %s"  % (icon, check_result["name"])
+
 
     def _put_report(self, insights_system_id, policy_result):
 
@@ -270,7 +270,7 @@ class CallbackModule(CallbackBase):
             self.send_report(host, insights_system_id, self._build_log(self.items[host]))
             self.items[host] = []
 
-    def append_result(self, result, event_name):
+    def append_result(self, result, event_type):
         task_name = result._task.get_name()
         host_name = result._host.get_name()
 
@@ -291,10 +291,36 @@ class CallbackModule(CallbackBase):
             # good enough for now
             return
 
-        self._append_result(host_name, event_name, task_name, result._result)
+        self._append_result(host_name,
+                            event_type,
+                            task_name,
+                            result._result)
 
-    def _append_result(self, host_name, event_name, task_name, task_result):
-        self.items[host_name].append((event_name, task_name, task_result))
+    def _append_result(self, host_name, event_type, task_name, task_result):
+        self.items[host_name].append((self.summarize_task_result(event_type, task_result),
+                                      task_name,
+                                      task_result))
+
+    def summarize_task_result(self, event_type, result):
+        if event_type == "on_ok":
+            if result.get('changed', False):
+                return "fail"
+            else:
+                return "pass"
+
+        elif event_type == "on_skipped":
+            return "skipped"
+
+        # return 'error' for everything else
+        elif event_type == "on_failed":
+            return "error"
+
+        elif event_type == "on_unreachable":
+            return "error"
+
+        else:
+            return "error"
+
 
 
     # Ansible Callback API
@@ -305,22 +331,16 @@ class CallbackModule(CallbackBase):
         self.playbook_name = os.path.splitext(os.path.basename(playbook._file_name))[0]
 
     def v2_runner_on_failed(self, result, ignore_errors=False):
-        self.append_result(result, "error")
+        self.append_result(result, "on_failed")
 
     def v2_runner_on_ok(self, result):
-        # This follows the logic of this function in the 'default.py' callback
-        # but all we need to determine is "changed" vs "ok"
-        # which we translate to "failed" vs "passed"
-        if result._result.get('changed', False):
-            self.append_result(result, "failed")
-        else:
-            self.append_result(result, "passed")
+        self.append_result(result, "on_ok")
 
     def v2_runner_on_skipped(self, result):
-        self.append_result(result, "skipped")
+        self.append_result(result, "on_skipped")
 
     def v2_runner_on_unreachable(self, result):
-        self.append_result(result, "unreachable")
+        self.append_result(result, "on_unreachable")
 
     def v2_playbook_on_stats(self, stats):
         self.send_reports()
