@@ -3,6 +3,8 @@
 #  ensures that 'redhat-access-insights' is installed
 #  ensures that system is registered with Insights service
 #  ensures that Insights system_id fact collector is installed
+#  ensures that the permissions on /etc/redhat-access-insights/redhat-access-insights.conf,
+#    which contains the system_id, are such that normal users can read it.
 #
 - hosts: all
   become: yes
@@ -23,6 +25,14 @@
     - name: If we just installed, also register
       when: install_insights_task.changed
       command: redhat-access-insights --register
+
+    - file:
+        path: /etc/redhat-access-insights
+        mode: og=rx
+
+    - file:
+        path: /etc/redhat-access-insights/redhat-access-insights.conf
+        mode: og=r
 
     - name: create directory for ansible custom facts
       file: state=directory recurse=yes path=/etc/ansible/facts.d
