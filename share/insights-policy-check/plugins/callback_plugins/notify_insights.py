@@ -120,12 +120,39 @@ class CallbackModule(CallbackBase):
                 self.insights_config_section = each
                 break
 
+        self.username = None
+        self.password = None
+        self.cert = None
+
         if self.insights_config_section:
             self.username = self.insights_config.get(self.insights_config_section, "username")
             self.password = self.insights_config.get(self.insights_config_section, "password")
-        else:
-            self.username = None
-            self.password = None
+
+        if not self.username:
+            self._display.vvv("Not using BASIC AUTH to login to Insights, could not find USERNAME in configuration")
+            try:
+                from rhsm.config import initConfig
+                rhsm_config = initConfig()
+                rhsm_consumerCertDir = rhsm_config.get('rhsm', 'consumerCertDir')
+
+                cert = os.path.join(rhsm_consumerCertDir, "cert.pem")
+                rhsm_key = os.path.join(rhsm_consumerCertDir, "key.pem")
+
+                def try_open(file, file_kind):
+                    try:
+                        self._display.vvv("Found %s: %s" % (file_kind, file))
+                        open(file).close()
+                    except Exception as ex:
+                        self._display.vvv("Could not open %s %s: %s" % (file_kind, file, ex))
+                        raise ex
+
+                try_open(cert, "RHSM CERT")
+                try_open(rhsm_key, "RHSM KEY")
+
+                self.cert = (cert, rhsm_key)
+
+            except Exception as ex:
+                self._display.vvv("Not using CERT AUTH to login to Insights, could not load RHSM CERT or KEY: %s" % ex)
 
     def parse_config_file(self, conf_file):
         """
@@ -180,8 +207,8 @@ class CallbackModule(CallbackBase):
         if not self.banner_printed:
             self._display.banner("CHECKMODE SUMMARY")
             self.banner_printed = True
-            if not self.username:
-                self._display.display("\tNot sending results to Insights, username/password not available")
+            if not (self.username or self.cert):
+                self._display.display("\tNot sending results to Insights, not registered and username/password not available")
                 self._display.display("")
 
         # Print out a short summary of the test tasks
@@ -193,7 +220,7 @@ class CallbackModule(CallbackBase):
         for each in policy_result["check_results"]:
             self._display.display(self._format_summary_for(each))
 
-        if self.username:
+        if self.username or self.cert:
             if insights_system_id:
                 self._put_report(insights_system_id, policy_result)
             else:
@@ -244,8 +271,9 @@ class CallbackModule(CallbackBase):
                                data=json.dumps(policy_result),
                                headers=headers,
                                auth=(self.username, self.password),
-                               #cert=cert
+                               cert=self.cert,
                                verify=verify)
+
         if (res.status_code == 201 or res.status_code == 200) \
            and 'Content-Type' in res.headers and 'json' in res.headers['Content-Type']:
             self._display.vvv("RESULT:")
@@ -254,7 +282,9 @@ class CallbackModule(CallbackBase):
             content_type = None
             if 'Content-Type' in res.headers:
                 content_type = res.headers['Content-Type']
-            self._display.warning('For {}, Unexpected Status Code({}) or Content-Type({}) with content "{}".'.format(url, res.status_code, content_type, res.content))
+            self._display.warning('For %s, Unexpected Status Code(%s) or Content-Type(%s) with content "%s".' % (url, res.status_code, content_type, res.content))
+            if not self.cert:
+                self._display.warning("Cert was not found or was not accessable")
             if not self.username:
                 self._display.warning("Username is empty or None")
             if not self.password:
