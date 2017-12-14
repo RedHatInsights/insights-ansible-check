@@ -138,7 +138,7 @@ must be able to get the Insights System ID off each target system.
 
 For ``insights-policy-check`` to be able to log into Insights from the control system.
 
-If you are running your playbooks as root, and your control system is registered to either
+If you are running  ``insights-policy-check`` as root, and your control system is registered to either
 Red Hat Insights or Red Hat Subscription Manager, ``insights-policy-check`` can log into
 Insights already.
 
@@ -152,11 +152,14 @@ RHN, or RHSM).
 
 For ``insights-policy-check`` to be able to get the Insights System ID off each target system,
 the Insights collector (redhat-access-insights) must be installed and registered on each target
-system, and the Insights fact plugin must be installed on each target system.  The
-``insights-installer.yml`` playbook in ``support-playbooks`` will ensure both of these are true::
+system, and the Insights fact plugin must be installed on each target system.  Ferthermore, if
+the your playbooks are not running as root (become: True), then you must adjust the permisssions
+on the file containing the Insights System ID so that non-root users can read it.  The playbook
+``insights-installer.yml`` in ``support-playbooks`` will ensure all of these are true::
 
      ansible-playbook -l <HOSTLIST> support-playbooks/insights-installer.yml
 
+Where <HOSTLIST> is all of the target systems.
 
 Installing 'insights-policy-check'
 ------
