@@ -51,19 +51,19 @@ In the example below are two RHEL 6.6 machines, one with FIPS mode enabled one w
 
     CHECKMODE SUMMARY **************************************************************
     gavin-rhel66-nofips		7ce9d65c-729d-4769-b038-db725bb69641
-        failed : fips mode must be enabled
+        fail : fips mode must be enabled
     gavin-rhel66-yesfips		31efea29-6020-4dfa-be47-f1aca02fba28
-        passed : fips mode must be enabled
+        pass : fips mode must be enabled
 
-In the CHECKMODE SUMMARY, the final "passed" and "failed" are the important bits.  The label
-"failed" is a big red "X", no this system is NOT in fips mode.  The label "passed" is a green
+In the CHECKMODE SUMMARY, the final "pass" and "fail" are the important bits.  The label
+"fail" is a big red "X", no this system is NOT in fips mode.  The label "pass" is a green
 checkmark, yes the system is in fips mode.
 
 When a playbook is run in --check mode, the status "changed" doen't mean actually changed, it
 means would have been changed, not in the state specified by the task.  This is why we map
-"changed" to "failed".
+"changed" to "fail".
 
-The status "ok" means the system is in the state specified by the task, so we map that to "passed".
+The status "ok" means the system is in the state specified by the task, so we map that to "pass".
 
 Note that the status "ok" is also returned for tasks that don't specify a state for the system,
 but instead just gather facts, or other information from the system.  The initial, implicit,
@@ -136,8 +136,13 @@ To send Insights Check Mode data to the Insights service, two things must be tru
 ``insights-policy-check`` must log into Insights from the control system.  Second, it
 must be able to get the Insights System ID off each target system.
 
-For ``insights-policy-check`` to be able to log into Insights from the control system, you
-must put a Red Hat username/password in ``~/.insights.conf``::
+For ``insights-policy-check`` to be able to log into Insights from the control system.
+
+If you are running your playbooks as root, and your control system is registered to either
+Red Hat Insights or Red Hat Subscription Manager, ``insights-policy-check`` can log into
+Insights already.
+
+Otherwise, you must put a Red Hat username/password in ``~/.insights.conf``::
   [insights-client]
   username=<USERNAME>
   password=<PASSWORD>
