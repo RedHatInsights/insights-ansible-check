@@ -52,5 +52,6 @@
         chdir: ./insights-policy-check/
       register: check_task
 
+    - debug: var=check_task.stderr_lines
     - debug: var=check_task.stdout_lines
 
