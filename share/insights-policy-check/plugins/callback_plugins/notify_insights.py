@@ -84,8 +84,6 @@ class insights_constants(object):
     default_cmd_timeout = 600  # default command execution to ten minutes, prevents long running commands that will hang
 
 class CallbackModule(CallbackBase):
-    """
-    """
 
     CALLBACK_VERSION = 2.0
     CALLBACK_TYPE = 'notification'
@@ -95,6 +93,15 @@ class CallbackModule(CallbackBase):
     CALLBACK_NEEDS_WHITELIST = False
 
     TIME_FORMAT = "%Y-%m-%d %H:%M:%S %f"
+
+    def v3(self, message):
+        self._display.vvv("[notify_insights plugin] " + message)
+
+    def warning(self, message):
+        self._display.warning("[notify_insights plugin] " + message)
+
+    def error(self, message):
+        self._display.error("[notify_insights plugin] " + message)
 
     def __init__(self):
         super(CallbackModule, self).__init__()
@@ -108,17 +115,25 @@ class CallbackModule(CallbackBase):
             os.path.expanduser('~/.insights.conf'),
         ]
 
+        possible_conf_sections = [
+            "insights-client",
+            "redhat-access-insights",
+            "redhat_access_insights",
+        ]
+
         path = os.getenv('INSIGHTS_CONF')
         if path:
             possible_conf_paths.append(path)
 
         self.insights_config = self.parse_config_file(possible_conf_paths)
 
+        self.v3("Searching for Insights config sections from: %s" % possible_conf_sections)
         self.insights_config_section = None
-        for each in ["insights-client", "redhat-access-insights", "redhat_access_insights"]:
+        for each in possible_conf_sections:
             if self.insights_config.has_section(each):
                 self.insights_config_section = each
                 break
+        self.v3("Using Insights config section: %s" % self.insights_config_section)
 
         self.username = None
         self.password = None
@@ -128,8 +143,13 @@ class CallbackModule(CallbackBase):
             self.username = self.insights_config.get(self.insights_config_section, "username")
             self.password = self.insights_config.get(self.insights_config_section, "password")
 
-        if not self.username:
-            self._display.vvv("Not using BASIC AUTH to login to Insights, could not find USERNAME in configuration")
+        if self.username:
+            self.v3("Found 'username' in configuration, using BASIC AUTH to login to Insights")
+            if self.password == None:
+                self.password = ""
+                self.warning("Found NO 'password' in configuration, using BASIC AUTH with empty password")
+        else:
+            self.v3("Not using BASIC AUTH to login to Insights, could not find 'username' in configuration")
             try:
                 from rhsm.config import initConfig
                 rhsm_config = initConfig()
@@ -140,10 +160,10 @@ class CallbackModule(CallbackBase):
 
                 def try_open(file, file_kind):
                     try:
-                        self._display.vvv("Found %s: %s" % (file_kind, file))
+                        self.v3("Found %s: %s" % (file_kind, file))
                         open(file).close()
                     except Exception as ex:
-                        self._display.vvv("Could not open %s %s: %s" % (file_kind, file, ex))
+                        self.v3("Could not open %s %s: %s" % (file_kind, file, ex))
                         raise ex
 
                 try_open(cert, "RHSM CERT")
@@ -152,12 +172,15 @@ class CallbackModule(CallbackBase):
                 self.cert = (cert, rhsm_key)
 
             except Exception as ex:
-                self._display.vvv("Not using CERT AUTH to login to Insights, could not load RHSM CERT or KEY: %s" % ex)
+                self.v3("Not using CERT AUTH to login to Insights, could not load RHSM CERT or KEY: %s" % ex)
 
     def parse_config_file(self, conf_file):
         """
         Parse the configuration from the file
         """
+
+        self.v3("Searching for Insights config files at: %s" % conf_file)
+
         parsedconfig = ConfigParser.RawConfigParser(
             {'loglevel': insights_constants.log_level,
              'trace': 'False',
@@ -185,7 +208,7 @@ class CallbackModule(CallbackBase):
         try:
             parsedconfig.read(conf_file)
         except ConfigParser.Error:
-            self._display.vvv("Could not read configuration file, using defaults")
+            self.v3("Could not read configuration file, using defaults")
             pass
         return parsedconfig
 
@@ -255,13 +278,13 @@ class CallbackModule(CallbackBase):
             except:
                 pass
 
-        self._display.vvv("PUT %s" % url)
-        self._display.vvv("VERIFY %s" % verify)
+        self.v3("PUT %s" % url)
+        self.v3("VERIFY %s" % verify)
         if HasSubjectAltNameWarning:
-            self._display.vvv("Ignoring SubjectAltNameWarning for this PUT")
+            self.v3("Ignoring SubjectAltNameWarning for this PUT")
         else:
-            self._display.vvv("Ignoring all warnings for this PUT")
-        self._display.vvv(json.dumps(policy_result, indent=2))
+            self.v3("Ignoring all warnings for this PUT")
+        self.v3("REQUEST BODY: " + json.dumps(policy_result, indent=2))
         with warnings.catch_warnings():
             if HasSubjectAltNameWarning:
                 warnings.simplefilter("ignore", SubjectAltNameWarning)
@@ -276,19 +299,12 @@ class CallbackModule(CallbackBase):
 
         if (res.status_code == 201 or res.status_code == 200) \
            and 'Content-Type' in res.headers and 'json' in res.headers['Content-Type']:
-            self._display.vvv("RESULT:")
-            self._display.vvv(json.dumps(json.loads(res.content), indent=2))
+            self.v3("RESPONSE BODY: " + json.dumps(json.loads(res.content), indent=2))
         else:
             content_type = None
             if 'Content-Type' in res.headers:
                 content_type = res.headers['Content-Type']
-            self._display.warning('For %s, Unexpected Status Code(%s) or Content-Type(%s) with content "%s".' % (url, res.status_code, content_type, res.content))
-            if not self.cert:
-                self._display.warning("Cert was not found or was not accessable")
-            if not self.username:
-                self._display.warning("Username is empty or None")
-            if not self.password:
-                self._display.warning("Password is empty or None")
+            self.error('For %s, Unexpected Status Code(%s) or Content-Type(%s) with content "%s".' % (url, res.status_code, content_type, res.content))
 
     def send_reports(self):
         self.banner_printed = False
