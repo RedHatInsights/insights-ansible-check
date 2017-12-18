@@ -284,7 +284,7 @@ class CallbackModule(CallbackBase):
             self.v3("Ignoring SubjectAltNameWarning for this PUT")
         else:
             self.v3("Ignoring all warnings for this PUT")
-        self.v3("REQUEST BODY: " + json.dumps(policy_result, indent=2))
+        self.v3("REQUEST Content: " + json.dumps(policy_result, indent=2))
         with warnings.catch_warnings():
             if HasSubjectAltNameWarning:
                 warnings.simplefilter("ignore", SubjectAltNameWarning)
@@ -297,14 +297,37 @@ class CallbackModule(CallbackBase):
                                cert=self.cert,
                                verify=verify)
 
-        if (res.status_code == 201 or res.status_code == 200) \
-           and 'Content-Type' in res.headers and 'json' in res.headers['Content-Type']:
-            self.v3("RESPONSE BODY: " + json.dumps(json.loads(res.content), indent=2))
+        def format_response(display_function, response):
+            display_function("RESPONSE Status Code: %s" % response.status_code)
+            display_function("RESPONSE Reason: %s" % response.reason)
+
+            try:
+                # Insights normally returns JSON
+                display_function("RESPONSE Content: %s" % json.dumps(response.json(), indent=2))
+
+            except:
+                # Just in case
+                if 'Content-Type' in response.headers:
+                    display_function("RESPONSE Content-Type: %s" % response.headers['Content-Type'])
+                else:
+                    display_function("RESPONSE Content-Type: None")
+                display_function("RESPONSE Content: %s" % response.text)
+
+        if res.status_code in (200,201):
+            format_response(self.v3, res)
+
+        elif res.status_code == 401:
+            if self.username:
+                self.error("Username/Password not valid for Insights")
+            if self.cert:
+                self.error("Certificate not valid for Insights")
+            if not (self.username or self.cert):
+                self.error("Authorization Required for Insights")
+            format_response(self.error, res)
+
         else:
-            content_type = None
-            if 'Content-Type' in res.headers:
-                content_type = res.headers['Content-Type']
-            self.error('For %s, Unexpected Status Code(%s) or Content-Type(%s) with content "%s".' % (url, res.status_code, content_type, res.content))
+            self.error("Unexpected Response")
+            format_response(self.error, res)
 
     def send_reports(self):
         self.banner_printed = False
