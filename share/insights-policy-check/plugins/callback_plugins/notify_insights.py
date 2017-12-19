@@ -44,12 +44,6 @@ for each in ['insights-client', 'redhat-access-insights']:
         found_default_conf_dir = os.path.join('/etc', each)
         break
 
-possible_CA_VERIFY_files = [
-    "/etc/rhsm/ca/redhat-uep.pem",
-    "/etc/redhat-access-insights/cert-api.access.redhat.com.pem",
-    "/etc/insights-client/cert-api.access.redhat.com.pem",
-]
-
 class insights_constants(object):
     app_name = 'insights-request'
     conf_name = found_conf_name
@@ -135,18 +129,18 @@ class CallbackModule(CallbackBase):
                 break
         self.v3("Using Insights config section: %s" % self.insights_config_section)
 
-        self.username = None
-        self.password = None
-        self.cert = None
+        username = None
+        password = None
+        cert = None
 
         if self.insights_config_section:
-            self.username = self.insights_config.get(self.insights_config_section, "username")
-            self.password = self.insights_config.get(self.insights_config_section, "password")
+            username = self.insights_config.get(self.insights_config_section, "username")
+            password = self.insights_config.get(self.insights_config_section, "password")
 
-        if self.username:
+        if username:
             self.v3("Found 'username' in configuration, using BASIC AUTH to login to Insights")
-            if self.password == None:
-                self.password = ""
+            if password == None:
+                password = ""
                 self.warning("Found NO 'password' in configuration, using BASIC AUTH with empty password")
         else:
             self.v3("Not using BASIC AUTH to login to Insights, could not find 'username' in configuration")
@@ -155,8 +149,8 @@ class CallbackModule(CallbackBase):
                 rhsm_config = initConfig()
                 rhsm_consumerCertDir = rhsm_config.get('rhsm', 'consumerCertDir')
 
-                cert = os.path.join(rhsm_consumerCertDir, "cert.pem")
-                rhsm_key = os.path.join(rhsm_consumerCertDir, "key.pem")
+                cert_filename = os.path.join(rhsm_consumerCertDir, "cert.pem")
+                rhsm_key_filename = os.path.join(rhsm_consumerCertDir, "key.pem")
 
                 def try_open(file, file_kind):
                     try:
@@ -166,13 +160,43 @@ class CallbackModule(CallbackBase):
                         self.v3("Could not open %s %s: %s" % (file_kind, file, ex))
                         raise ex
 
-                try_open(cert, "RHSM CERT")
-                try_open(rhsm_key, "RHSM KEY")
+                try_open(cert_filename, "RHSM CERT")
+                try_open(rhsm_key_filename, "RHSM KEY")
 
-                self.cert = (cert, rhsm_key)
+                cert = (cert_filename, rhsm_key_filename)
 
             except Exception as ex:
                 self.v3("Not using CERT AUTH to login to Insights, could not load RHSM CERT or KEY: %s" % ex)
+
+        self.session = None
+        if username or cert:
+            self.v3("Setting up HTTP Session")
+            self.session = requests.Session()
+            self.session.auth = (username, password)
+            self.session.cert = cert
+
+            possible_CA_VERIFY_files = [
+                "/etc/rhsm/ca/redhat-uep.pem",
+                "/etc/redhat-access-insights/cert-api.access.redhat.com.pem",
+                "/etc/insights-client/cert-api.access.redhat.com.pem",
+            ]
+
+            self.session.verify = False
+            for filename in possible_CA_VERIFY_files:
+                try:
+                    with open(filename):
+                        self.session.verify = filename
+                        break
+                except:
+                    pass
+            self.v3("HTTP Session VERIFY %s" % self.session.verify)
+
+            self.session.headers = {
+                'Content-Type': 'application/json',
+                'User-Agent': 'notify_insights',
+                'Accept': 'application/json',
+            }
+
 
     def parse_config_file(self, conf_file):
         """
@@ -230,7 +254,7 @@ class CallbackModule(CallbackBase):
         if not self.banner_printed:
             self._display.banner("CHECKMODE SUMMARY")
             self.banner_printed = True
-            if not (self.username or self.cert):
+            if not self.session:
                 self._display.display("\tNot sending results to Insights, not registered and username/password not available")
                 self._display.display("")
 
@@ -243,7 +267,7 @@ class CallbackModule(CallbackBase):
         for each in policy_result["check_results"]:
             self._display.display(self._format_summary_for(each))
 
-        if self.username or self.cert:
+        if self.session:
             if insights_system_id:
                 self._put_report(insights_system_id, policy_result)
             else:
@@ -268,18 +292,8 @@ class CallbackModule(CallbackBase):
     def _put_report(self, insights_system_id, policy_result):
 
         url = "https://cert-api.access.redhat.com/r/insights/v3/systems/%s/policies/%s" % (insights_system_id, self.playbook_name)
-        headers = {'Content-Type': 'application/json'}
-        verify = False
-        for filename in possible_CA_VERIFY_files:
-            try:
-                with open(filename):
-                    verify = filename
-                break
-            except:
-                pass
 
         self.v3("PUT %s" % url)
-        self.v3("VERIFY %s" % verify)
         if HasSubjectAltNameWarning:
             self.v3("Ignoring SubjectAltNameWarning for this PUT")
         else:
@@ -290,12 +304,7 @@ class CallbackModule(CallbackBase):
                 warnings.simplefilter("ignore", SubjectAltNameWarning)
             else:
                 warnings.simplefilter("ignore")
-            res = requests.put(url=url,
-                               data=json.dumps(policy_result),
-                               headers=headers,
-                               auth=(self.username, self.password),
-                               cert=self.cert,
-                               verify=verify)
+            res = self.session.put(url=url, data=json.dumps(policy_result))
 
         def format_response(display_function, response):
             display_function("RESPONSE Status Code: %s" % response.status_code)
@@ -317,11 +326,11 @@ class CallbackModule(CallbackBase):
             format_response(self.v3, res)
 
         elif res.status_code == 401:
-            if self.username:
+            if self.session.auth:
                 self.error("Username/Password not valid for Insights")
-            if self.cert:
+            if self.session.cert:
                 self.error("Certificate not valid for Insights")
-            if not (self.username or self.cert):
+            if not (self.session.auth or self.session.cert):
                 self.error("Authorization Required for Insights")
             format_response(self.error, res)
 
