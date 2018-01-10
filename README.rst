@@ -155,9 +155,9 @@ the Insights collector (redhat-access-insights) must be installed and registered
 system, and the Insights fact plugin must be installed on each target system.  Ferthermore, if
 the your playbooks are not running as root (become: True), then you must adjust the permisssions
 on the file containing the Insights System ID so that non-root users can read it.  The playbook
-``insights-installer.yml`` in ``support-playbooks`` will ensure all of these are true::
+``redhat-insights-registered.yml`` in ``support-playbooks`` will ensure all of these are true::
 
-     ansible-playbook -l <HOSTLIST> support-playbooks/insights-installer.yml
+     ansible-playbook -l <HOSTLIST> support-playbooks/redhat-insights-registered.yml
 
 Where <HOSTLIST> is all of the target systems.
 
