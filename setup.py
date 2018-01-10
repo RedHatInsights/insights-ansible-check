@@ -26,7 +26,7 @@ setup(
     description='Conformance as an Ansible Playbook',
     long_description=long_description,
 
-    url='https://github.com/gavin-romig-koch/probable-giggle',
+    url='https://github.com/redhatinsights/insights-policy-check.git',
 
     author='Gavin Romig-Koch',
     author_email='gavin@redhat.com',
