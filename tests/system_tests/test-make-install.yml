@@ -1,0 +1,60 @@
+---
+# This playbook tests that the ./insights-policy-check script works from the
+#    git repo on each target host.
+#
+# This playbook only works on RHEL 6 and 7.
+#
+# This playbook assumes it is being run from within the insights-policy-check git repo.
+#
+# This playbook assumes that insights-policy-check's prerequisites have been installed:
+#   ansible
+#   requests
+#
+# In addition to the target hosts, this playbook requires that an additional host exists
+#   and is reachable from each target host by ansible through ssh.
+#   The name of this additional host is specified as an extra variable to this script,
+#   named 'checkhost':
+#
+#    ansible-playbook -l $NAME -e checkhost=gavin-rhel66-nofips tests/system_tests/test-in-repo.yml
+#
+# For each target host:
+#   * rsync the git repo to the target host
+#   * run ./insights-policy-check against 'checkhost'
+#   * print out the results (this should be improved)
+#
+- hosts: all
+  tasks:
+
+    # this only works on RHEL6 and RHEL7, FIXME
+    - name: only works on RHEL 6 and 7
+      assert:
+        that: ansible_distribution == "RedHat"
+
+
+    # copy local insights-policy-check repo to remote
+    - name: install rsync - synchronize won't work without rsync
+      become: true
+      package:
+        name: rsync
+
+    - name: copy local insights-policy-check repo to remote
+      synchronize:
+        src: ../../../
+        dest: ./insights-policy-check
+
+    - name: run make install
+      command: make install
+      args:
+        chdir: ./insights-policy-check/
+
+    - name: add known host keys for localhost
+      shell: ssh-keyscan {{ checkhost }} >>.ssh/known_hosts
+      # so that we don't get prompts for this when running insights-policy-check
+
+    - name: run a test of insights-policy-check
+      command: insights-policy-check -i {{ checkhost }}, insights-policy-check/playbooks/fips-mode-check.yml
+      register: check_task
+
+    - debug: var=check_task.stderr_lines
+    - debug: var=check_task.stdout_lines
+
