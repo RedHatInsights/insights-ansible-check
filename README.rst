@@ -1,38 +1,26 @@
 Custom Insights Policies as Ansible Playbooks, Ansible Playbooks that act as Insights Policies
 ---------------
 
-This is just the beginnings of a proof of concept.
-
 The general idea is that we run mostly normal Ansible playbooks in ``--check`` mode, and
 interpret the result of each task in the playbook as a conformance test, and then forward
-those interpreted results to Insights for display::
-
-   ./insights-policy-check --limit=localhost playbooks/no-dummy-hostname.yml
-
-Ansible must be installed and an Ansible inventory file created for any of the examples
-in this README to work.  See `Ansible Installation
-<http://docs.ansible.com/ansible/latest/intro_installation.html>`_.
-
-The Python module ``requests`` must also be installed::
-
-  yum install -y python-requests
-
+those interpreted conformace test results to Insights for display.
 
 Insights Check Mode
 ---------
 
 In Insights Check Mode, each playbook task is treated as a conformance test.  If the task
-ends with a status "ok", the conformance test passes.  If the task ends with a status "changed",
-the conformance test fails.  If the task is skipped, the task is ignored for the purposes of
-conformance testing.  Any other task status is treated as an error in the conformance testing.
+completes with a status "ok", the conformance test passes.  If the task completes with a status
+"changed", the conformance test fails.  If the task is skipped, the task is ignored for the
+purposes of conformance testing.  Any other task status is treated as an error in the
+conformance testing.
 
 When a playbook is run in Insights Check Mode, the result will be forwarded to the Insights
 server.  A new "CHECKMODE SUMMARY" is added to the end of the normal output from running
-the playbook.
+the playbook to show the data forwarded to Insights.
 
 In the example below are two RHEL 6.6 machines, one with FIPS mode enabled one without::
 
-    $ ./insights-policy-check --limit=gavin-rhel66-nofips,gavin-rhel66-yesfips playbooks/fips-mode-check.yml 
+    $ ./insights-policy-check --limit=gavin-rhel66-nofips,gavin-rhel66-yesfips playbooks/fips-mode-check.yml
 
     PLAY [all] *********************************************************************
 
@@ -45,8 +33,8 @@ In the example below are two RHEL 6.6 machines, one with FIPS mode enabled one w
     ok: [gavin-rhel66-yesfips]
 
     PLAY RECAP *********************************************************************
-    gavin-rhel66-nofips        : ok=2    changed=1    unreachable=0    failed=0   
-    gavin-rhel66-yesfips       : ok=2    changed=0    unreachable=0    failed=0   
+    gavin-rhel66-nofips        : ok=2    changed=1    unreachable=0    failed=0
+    gavin-rhel66-yesfips       : ok=2    changed=0    unreachable=0    failed=0
 
 
     CHECKMODE SUMMARY **************************************************************
@@ -74,17 +62,92 @@ distinguished.  In the specific case of the "Gathering Facts" task, we can disti
 instance, and not include it in the CHECKMODE SUMMARY.
 
 
+
 The Insights Check Mode command:
 ----------
 
 The command ``insights-policy-check`` runs an Ansible playbook in Insights Check Mode.  This
-command is just a wrapper around the ``ansible-playbook`` command.
+command is just a wrapper around the ``ansible-playbook`` command.  This wrapper script enables
+the Ansible plugins that implement Insights Check Mode.
+
+The command ``insights-policy-check`` takes exactly the same arguments as ``ansible-playbook``
+
+
+Preparing to run insights-policy-check
+--------------------------------------
+
+Before you can run ``insights-policy-check`` you must install its dependacies, and configure your
+systems to talk to the Insights service.
+
+Like Ansible, ``insights-policy-check`` has a Control Machine and one or more Managed Nodes which
+have different installation and configuration requirements.  The Control Machine is where
+``insights-policy-check`` is actually run.  The Managed Nodes are the systems where conformance
+will be tested.
+
+
+Preparing the Control Machine
+-----------------------------
 
 Ansible must be installed on the system where you run the insights-policy-check command, and
 you must have set up an Ansible Inventory for any systems you want to run ``insights-policy-check``
-against.
+against.  See `Ansible Installation
+<http://docs.ansible.com/ansible/latest/intro_installation.html>`_ for instructions on how to install
+and configure Ansible.
 
-The command ``insights-policy-check`` takes exactly the same arguments as ``ansible-playbook``
+If your Control Machine is a RHEL6 or RHEL7 system, the shell scripts ``support-scripts/rhel6-install-ansible.sh`` and ``support-scripts/rhel7-install-ansible.sh`` will install Ansible on those operating systems.  Additionally you will need to configure an Ansible inventory on your Control machine for your Managed Nodes.  See `Ansible Inventory <http://docs.ansible.com/ansible/latest/intro_inventory.html>`_.
+
+Additionally the Python module ``requests`` must also be installed on the Control Machine::
+
+  yum install -y python-requests
+
+Finally, ``insights-policy-check`` must be able to log into the Insights Service.  If you are
+going to run ``insights-policy-check`` as root, and your Control machine is registered to either
+Red Hat Insights or Red Hat Subscription Manager, ``insights-policy-check`` can log into
+Insights already.
+
+Otherwise, you must put a Red Hat username/password in ``~/.insights.conf``::
+  [insights-client]
+  username=<USERNAME>
+  password=<PASSWORD>
+
+Where ``<USERNAME>`` and ``<PASSWORD>`` are valid for Red Hat Insights (Red Hat Portal,
+RHN, or RHSM).
+
+
+Preparing the Managed Nodes
+---------------------------
+
+Each Managed node must have Insights installed, and it must be registered to the Insights service.
+
+Additionally, each Managed node must have some additional configuration to allow ``insights-policy-check`` to be able to get the Insights System ID off each Managed node.
+
+The Ansible playbook ``support-playbooks/redhat-insights-registered.yml`` ensures all these
+requirements.  On the Control Machine, run::
+
+     ansible-playbook -l <HOSTLIST> support-playbooks/redhat-insights-registered.yml
+
+Where <HOSTLIST> is a comma separated list of all of the Managed nodes.
+
+
+
+
+Running and Installing ``insights-policy-check``
+---------------------------------
+
+Once the prerequisites (Ansible and python-requests) on the Control machine are installed
+``insights-policy-check`` can be run.
+
+For testing and demoing purposes, the ``insights-policy-check`` script can be run directly
+from the git repo::
+
+   ./insights-policy-check --limit=localhost playbooks/no-dummy-hostname.yml
+
+It can also be installed onto the Control machine.  This will put the Insights Check Mode plugins
+into the standard Ansible plugins directories (/usr/share/ansible), and put the script into /usr/bin::
+
+  sudo make install
+
+
 
 Playbooks for Insights Check Mode
 ------
@@ -96,7 +159,7 @@ playbooks/no-dummy-hostname.yml
 
 playbooks/fips-mode-check.yml
   which checks that a system is in FIPS mode.
-   
+
 playbooks/prelink-absent-check.yml
   which checks that a system does not have the prelink package installed.
 
@@ -112,7 +175,7 @@ Run these playbooks in Insights Check Mode::
 
     ./insights-policy-check --limit=<HOST PATTERN> <CHECK PLAYBOOK>
 
-where ``<HOST PATTERN>`` is a comma separated list of hosts to run the check against 
+where ``<HOST PATTERN>`` is a comma separated list of hosts to run the check against
 ``<CHECK PLAYBOOK>`` is one of :
 
 - playbooks/fips-mode-check.yml
@@ -138,9 +201,9 @@ must be able to get the Insights System ID off each target system.
 
 For ``insights-policy-check`` to be able to log into Insights from the control system.
 
-If you are running  ``insights-policy-check`` as root, and your control system is registered to either
-Red Hat Insights or Red Hat Subscription Manager, ``insights-policy-check`` can log into
-Insights already.
+For the Control system, if you are running  ``insights-policy-check`` as root, and your
+control system is registered to either Red Hat Insights or Red Hat Subscription Manager,
+``insights-policy-check`` can log into Insights already.
 
 Otherwise, you must put a Red Hat username/password in ``~/.insights.conf``::
   [insights-client]
@@ -150,35 +213,21 @@ Otherwise, you must put a Red Hat username/password in ``~/.insights.conf``::
 Where ``<USERNAME>`` and ``<PASSWORD>`` are valid for Red Hat Insights (Red Hat Portal,
 RHN, or RHSM).
 
-For ``insights-policy-check`` to be able to get the Insights System ID off each target system,
-the Insights collector (redhat-access-insights) must be installed and registered on each target
-system, and the Insights fact plugin must be installed on each target system.  Ferthermore, if
-the your playbooks are not running as root (become: True), then you must adjust the permisssions
-on the file containing the Insights System ID so that non-root users can read it.  The playbook
-``redhat-insights-registered.yml`` in ``support-playbooks`` will ensure all of these are true::
+For the Managed nodes, for ``insights-policy-check`` to be able to get the Insights System ID
+off each target system, the Insights collector (redhat-access-insights) must be installed
+and registered on each target system, and the Insights fact plugin must be installed on
+each target system.  Ferthermore, if the your playbooks are not running as root (become: True),
+then you must adjust the permisssions on the file containing the Insights System ID so that
+non-root users can read it.  The playbook ``redhat-insights-registered.yml`` in
+``support-playbooks`` will ensure all of these are true::
 
      ansible-playbook -l <HOSTLIST> support-playbooks/redhat-insights-registered.yml
 
 Where <HOSTLIST> is all of the target systems.
 
-Installing 'insights-policy-check'
+
+
+Demoing and Testing 'insights-policy-check' with ``pip``
 ------
 
-The command ``insights-policy-check`` can be run directly from within the git repo, as all
-the examples above do.
-
-It can also be installed onto a system.
-
-For RHEL6 and RHEL7 production systems, first ensure that Ansible is installed on the system.
-See `Ansible Installation <http://docs.ansible.com/ansible/latest/intro_installation.html>`_.
-Then::
-
-    sudo make install
-
-
-For enviroments with pip installed, or within Python virtual enviroments::
-
-    sudo pip install .
-
-will install both the command and the associate Ansible plugins onto the current system, along
-with all of it's dependancies, including Ansible.
+``insights-policy-check`` can be installed using pip on those systems that have and use pip.
