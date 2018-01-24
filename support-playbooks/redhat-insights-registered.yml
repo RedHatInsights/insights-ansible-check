@@ -8,6 +8,17 @@
 #  ensures that the permissions on /etc/redhat-access-insights/machine-id,
 #    which contains the system_id, are such that normal users can read it.
 #
+# This playbook has two optional extra variables:
+#    redhat_portal_username
+#    redhat_portal_password
+# to be set to Insights (Red Hat Portal) credentials, if one is set the other must
+# also be set.
+# In redhat-portal-creds.yml: (where XXXX and YYYYY are replaced with Red Hat Portal credentials)
+#
+#    redhat_portal_username: XXXXXX
+#    redhat_portal_password: YYYYYY
+#    ansible-playbook .... --extra-vars @redhat-portal-creds.yml ..redhat-insights-registered.yml
+#
 - hosts: all
   become: yes
   tasks:
@@ -26,6 +37,24 @@
       name: redhat-access-insights
       state: present
     become: yes
+
+  - name: add username to redhat-access-insights.conf
+    ini_file:
+      path: /etc/redhat-access-insights/redhat-access-insights.conf
+      section: redhat-access-insights
+      option: username
+      value: "{{ redhat_portal_username }}"
+      no_extra_spaces: true
+    when: redhat_portal_username is defined
+
+  - name: add password to redhat-access-insights.conf
+    ini_file:
+      path: /etc/redhat-access-insights/redhat-access-insights.conf
+      section: redhat-access-insights
+      option: password
+      value: "{{ redhat_portal_password }}"
+      no_extra_spaces: true
+    when: redhat_portal_password is defined
 
   - name: Check status of Insights .register file
     stat: path=/etc/redhat-access-insights/.registered
