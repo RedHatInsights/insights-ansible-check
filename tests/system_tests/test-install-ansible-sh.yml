@@ -42,6 +42,7 @@
     - name: disable rhel-7-server-extras-rpms
       command: subscription-manager repos --disable=rhel-7-server-extras-rpms
       when: ansible_distribution_major_version == "7"
+      ignore_errors: yes
 
 
     # copy local insights-policy-check repo to remote
