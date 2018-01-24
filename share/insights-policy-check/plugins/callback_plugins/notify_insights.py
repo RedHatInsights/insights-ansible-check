@@ -83,10 +83,7 @@ class CallbackModule(CallbackBase):
     CALLBACK_TYPE = 'notification'
     CALLBACK_NAME = 'notify_insights'
 
-    # Ara doesn't define this at all
     CALLBACK_NEEDS_WHITELIST = True
-
-    TIME_FORMAT = "%Y-%m-%d %H:%M:%S %f"
 
     def v3(self, message):
         self._display.vvv("[notify_insights plugin] " + message)
@@ -120,6 +117,7 @@ class CallbackModule(CallbackBase):
             possible_conf_paths.append(path)
 
         self.insights_config = self.parse_config_file(possible_conf_paths)
+        self.base_url = "https://cert-api.access.redhat.com/r/insights"
 
         self.v3("Searching for Insights config sections from: %s" % possible_conf_sections)
         self.insights_config_section = None
@@ -196,6 +194,12 @@ class CallbackModule(CallbackBase):
                 'User-Agent': 'notify_insights',
                 'Accept': 'application/json',
             }
+
+            if not self.get(self.base_url + "/v1/branch_info", [200]):
+                self.session = None
+
+        else:
+            self.error("Not sending results to Insights, not registered and username/password not available")
 
 
     def parse_config_file(self, conf_file):
@@ -288,23 +292,23 @@ class CallbackModule(CallbackBase):
 
         return "    %s : %s"  % (icon, check_result["name"])
 
-
-    def _put_report(self, insights_system_id, policy_result):
-
-        url = "https://cert-api.access.redhat.com/r/insights/v3/systems/%s/policies/%s" % (insights_system_id, self.playbook_name)
-
-        self.v3("PUT %s" % url)
+    def request(self, method, url, policy_result, expected_results):
+        self.v3("%s %s" % (method, url))
         if HasSubjectAltNameWarning:
-            self.v3("Ignoring SubjectAltNameWarning for this PUT")
+            self.v3("Ignoring SubjectAltNameWarning for this %s" % method)
         else:
-            self.v3("Ignoring all warnings for this PUT")
-        self.v3("REQUEST Content: " + json.dumps(policy_result, indent=2))
+            self.v3("Ignoring all warnings for this %s" % method)
+        if policy_result:
+            self.v3("REQUEST Content: " + json.dumps(policy_result, indent=2))
         with warnings.catch_warnings():
             if HasSubjectAltNameWarning:
                 warnings.simplefilter("ignore", SubjectAltNameWarning)
             else:
                 warnings.simplefilter("ignore")
-            res = self.session.put(url=url, data=json.dumps(policy_result))
+            if method == "GET":
+                res = self.session.get(url)
+            else:
+                res = self.session.put(url=url, data=json.dumps(policy_result))
 
         def format_response(display_function, response):
             display_function("RESPONSE Status Code: %s" % response.status_code)
@@ -322,8 +326,9 @@ class CallbackModule(CallbackBase):
                     display_function("RESPONSE Content-Type: None")
                 display_function("RESPONSE Content: %s" % response.text)
 
-        if res.status_code in (200,201):
+        if res.status_code in expected_results:
             format_response(self.v3, res)
+            return True
 
         elif res.status_code == 401:
             if self.session.auth:
@@ -333,10 +338,24 @@ class CallbackModule(CallbackBase):
             if not (self.session.auth or self.session.cert):
                 self.error("Authorization Required for Insights")
             format_response(self.error, res)
+            return False
 
         else:
             self.error("Unexpected Response")
             format_response(self.error, res)
+            return False
+
+    def get(self, url, expected_result):
+        return self.request("GET", url, None, expected_result)
+
+    def put(self, url, policy_result, expected_result):
+        return self.request("PUT", url, policy_result, expected_result)
+
+    def _put_report(self, insights_system_id, policy_result):
+
+        url = self.base_url + ("/v3/systems/%s/policies/%s" % (insights_system_id, self.playbook_name))
+        expected_result = [200,201]
+        self.put(url, policy_result, expected_result)
 
     def send_reports(self):
         self.banner_printed = False
