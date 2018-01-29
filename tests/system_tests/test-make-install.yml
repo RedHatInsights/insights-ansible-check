@@ -1,14 +1,13 @@
 ---
-# This playbook tests that the ./insights-policy-check script works from the
-#    git repo on each target host.
-#
-# This playbook only works on RHEL 6 and 7.
+# This playbook tests that insights-policy-check works after being installed
+#    on each target host.
 #
 # This playbook assumes it is being run from within the insights-policy-check git repo.
 #
-# This playbook assumes that insights-policy-check's prerequisites have been installed:
-#   ansible
-#   requests
+# This playbook assumes that insights-policy-check's prerequisites have been installed
+#  on each target host:
+#    ansible
+#    requests
 #
 # In addition to the target hosts, this playbook requires that an additional host exists
 #   and is reachable from each target host by ansible through ssh.
@@ -25,13 +24,6 @@
 - hosts: all
   tasks:
 
-    # this only works on RHEL6 and RHEL7, FIXME
-    - name: only works on RHEL 6 and 7
-      assert:
-        that: ansible_distribution == "RedHat"
-
-
-    # copy local insights-policy-check repo to remote
     - name: install rsync - synchronize won't work without rsync
       become: true
       package:
@@ -42,12 +34,16 @@
         src: ../../../
         dest: ./insights-policy-check
 
+    - name: install make command
+      package:
+        name: make
+
     - name: run make install
       command: make install
       args:
         chdir: ./insights-policy-check/
 
-    - name: add known host keys for localhost
+    - name: add known host keys for checkhost
       shell: ssh-keyscan {{ checkhost }} >>.ssh/known_hosts
       # so that we don't get prompts for this when running insights-policy-check
 
