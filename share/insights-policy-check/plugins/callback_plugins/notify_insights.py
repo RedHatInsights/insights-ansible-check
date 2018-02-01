@@ -11,8 +11,20 @@ DOCUMENTATION = '''
     type: notification
     short_description: Treat task results as PASS/FAIL and sends results to Insights as a Policy
     description:
-      - Treat task results as PASS/FAIL and sends results to Insights as a Policy
+      - Interpret a playbook as test suite, with each task result as PASS/FAIL test, and then
+        sends results to Insights as a Policy.
+      - The plugin assumes the playbook is running in --check mode, though it does not verify
+            or enforce this.
+      - In --check mode, "ok" indicates that the system is in the state specified by the task,
+        and this plugin treats that as PASS.  In --check mode, "changed" indicates that the system
+        is not in the state specified by the task, and this plugin treats that as FAIL.  In this
+        way we interpret a playbook as a test suite.  Other results, like "skipped" and "error",
+        are left as is.
+      - This plugin collects all results for all systems, and sends PASS, FAIL, and error results
+        are sent to the Insights Server as an Insights Policy.
     requirements:
+      - whitelisting in configuration
+      - requests (python library)
 '''
 
 from datetime import datetime
